@@ -40,7 +40,7 @@ func (api *Api) GetUsers(w http.ResponseWriter, r *http.Request) {
 		parsed, err := strconv.Atoi(p)
 		if err != nil || parsed < 1 {
 			w.WriteHeader(http.StatusBadRequest)
-			_ = api.templates.ExecuteTemplate(w, "users.html", UsersPageData{
+			api.renderTemplate(w, "users.html", UsersPageData{
 				Error: "invalid page",
 				Page:  1,
 				Limit: limit,
@@ -54,7 +54,7 @@ func (api *Api) GetUsers(w http.ResponseWriter, r *http.Request) {
 		parsed, err := strconv.Atoi(l)
 		if err != nil || parsed < 1 {
 			w.WriteHeader(http.StatusBadRequest)
-			_ = api.templates.ExecuteTemplate(w, "users.html", UsersPageData{
+			api.renderTemplate(w, "users.html", UsersPageData{
 				Error: "invalid limit",
 				Page:  page,
 				Limit: 10,
@@ -69,10 +69,10 @@ func (api *Api) GetUsers(w http.ResponseWriter, r *http.Request) {
 
 	offset := (page - 1) * limit
 
-	users, err := api.db.GetUsers(limit, offset)
+	users, err := api.db.GetUsers(r.Context(), limit, offset)
 	if err != nil {
 		w.WriteHeader(http.StatusInternalServerError)
-		_ = api.templates.ExecuteTemplate(w, "users.html", UsersPageData{
+		api.renderTemplate(w, "users.html", UsersPageData{
 			Error: "failed to fetch users",
 			Page:  page,
 			Limit: limit,
@@ -86,7 +86,7 @@ func (api *Api) GetUsers(w http.ResponseWriter, r *http.Request) {
 	}
 	nextPage := page + 1
 
-	_ = api.templates.ExecuteTemplate(w, "users.html", UsersPageData{
+	api.renderTemplate(w, "users.html", UsersPageData{
 		Users:    users,
 		Page:     page,
 		Limit:    limit,
@@ -100,30 +100,30 @@ func (api *Api) GetUser(w http.ResponseWriter, r *http.Request) {
 	id, err := strconv.ParseInt(idStr, 10, 64)
 	if err != nil {
 		w.WriteHeader(http.StatusBadRequest)
-		_ = api.templates.ExecuteTemplate(w, "edit.html", EditPageData{
+		api.renderTemplate(w, "edit.html", EditPageData{
 			Error: "invalid id",
 		})
 		return
 	}
 
-	user, err := api.db.GetUserByID(id)
+	user, err := api.db.GetUserByID(r.Context(), id)
 	if err != nil {
 		if errors.Is(err, database.ErrUserNotFound) {
 			w.WriteHeader(http.StatusNotFound)
-			_ = api.templates.ExecuteTemplate(w, "edit.html", EditPageData{
+			api.renderTemplate(w, "edit.html", EditPageData{
 				Error: "user not found",
 			})
 			return
 		}
 		log.Print(err)
 		w.WriteHeader(http.StatusInternalServerError)
-		_ = api.templates.ExecuteTemplate(w, "edit.html", EditPageData{
+		api.renderTemplate(w, "edit.html", EditPageData{
 			Error: "failed to fetch user",
 		})
 		return
 	}
 
-	_ = api.templates.ExecuteTemplate(w, "edit.html", EditPageData{
+	api.renderTemplate(w, "edit.html", EditPageData{
 		User: user,
 	})
 }
@@ -134,10 +134,10 @@ func (api *Api) CreateUser(w http.ResponseWriter, r *http.Request) {
 	const offset = 0
 
 	render := func(status int, msg string, form UsersForm) {
-		users, err := api.db.GetUsers(limit, offset)
+		users, err := api.db.GetUsers(r.Context(), limit, offset)
 		if err != nil {
 			w.WriteHeader(http.StatusInternalServerError)
-			_ = api.templates.ExecuteTemplate(w, "users.html", UsersPageData{
+			api.renderTemplate(w, "users.html", UsersPageData{
 				Error:    "failed to fetch users",
 				Page:     page,
 				Limit:    limit,
@@ -148,7 +148,7 @@ func (api *Api) CreateUser(w http.ResponseWriter, r *http.Request) {
 		}
 
 		w.WriteHeader(status)
-		_ = api.templates.ExecuteTemplate(w, "users.html", UsersPageData{
+		api.renderTemplate(w, "users.html", UsersPageData{
 			Users:    users,
 			Form:     form,
 			Error:    msg,
@@ -159,7 +159,10 @@ func (api *Api) CreateUser(w http.ResponseWriter, r *http.Request) {
 		})
 	}
 
-	_ = r.ParseForm()
+	if err := r.ParseForm(); err != nil {
+		http.Error(w, "Bad Request", http.StatusBadRequest)
+		return
+	}
 	name := r.FormValue("name")
 	email := r.FormValue("email")
 	ageStr := r.FormValue("age")
@@ -197,7 +200,7 @@ func (api *Api) CreateUser(w http.ResponseWriter, r *http.Request) {
 		Age:   age,
 	}
 
-	if err := api.db.CreateUser(user); err != nil {
+	if err := api.db.CreateUser(r.Context(), user); err != nil {
 		log.Print(err)
 		render(http.StatusInternalServerError, "failed to create user", UsersForm{
 			Name:  name,
@@ -215,13 +218,16 @@ func (api *Api) EditUser(w http.ResponseWriter, r *http.Request) {
 	id, err := strconv.ParseInt(idStr, 10, 64)
 	if err != nil {
 		w.WriteHeader(http.StatusBadRequest)
-		_ = api.templates.ExecuteTemplate(w, "edit.html", EditPageData{
+		api.renderTemplate(w, "edit.html", EditPageData{
 			Error: "invalid id",
 		})
 		return
 	}
 
-	_ = r.ParseForm()
+	if err := r.ParseForm(); err != nil {
+		http.Error(w, "Bad Request", http.StatusBadRequest)
+		return
+	}
 	name := r.FormValue("name")
 	email := r.FormValue("email")
 	ageStr := r.FormValue("age")
@@ -229,7 +235,7 @@ func (api *Api) EditUser(w http.ResponseWriter, r *http.Request) {
 	age, err := strconv.Atoi(ageStr)
 	if err != nil {
 		w.WriteHeader(http.StatusBadRequest)
-		_ = api.templates.ExecuteTemplate(w, "edit.html", EditPageData{
+		api.renderTemplate(w, "edit.html", EditPageData{
 			User:  &database.User{ID: id, Name: name, Email: email},
 			Error: "age must be a number",
 		})
@@ -238,7 +244,7 @@ func (api *Api) EditUser(w http.ResponseWriter, r *http.Request) {
 
 	if name == "" || email == "" {
 		w.WriteHeader(http.StatusBadRequest)
-		_ = api.templates.ExecuteTemplate(w, "edit.html", EditPageData{
+		api.renderTemplate(w, "edit.html", EditPageData{
 			User:  &database.User{ID: id, Name: name, Email: email, Age: age},
 			Error: "name and email are required",
 		})
@@ -246,7 +252,7 @@ func (api *Api) EditUser(w http.ResponseWriter, r *http.Request) {
 	}
 	if age <= 0 {
 		w.WriteHeader(http.StatusBadRequest)
-		_ = api.templates.ExecuteTemplate(w, "edit.html", EditPageData{
+		api.renderTemplate(w, "edit.html", EditPageData{
 			User:  &database.User{ID: id, Name: name, Email: email, Age: age},
 			Error: "age must be greater than 0",
 		})
@@ -260,10 +266,10 @@ func (api *Api) EditUser(w http.ResponseWriter, r *http.Request) {
 		Age:   age,
 	}
 
-	if err := api.db.UpdateUser(user); err != nil {
+	if err := api.db.UpdateUser(r.Context(), user); err != nil {
 		if errors.Is(err, database.ErrUserNotFound) {
 			w.WriteHeader(http.StatusNotFound)
-			_ = api.templates.ExecuteTemplate(w, "edit.html", EditPageData{
+			api.renderTemplate(w, "edit.html", EditPageData{
 				User:  user,
 				Error: "user not found",
 			})
@@ -271,7 +277,7 @@ func (api *Api) EditUser(w http.ResponseWriter, r *http.Request) {
 		}
 		log.Print(err)
 		w.WriteHeader(http.StatusInternalServerError)
-		_ = api.templates.ExecuteTemplate(w, "edit.html", EditPageData{
+		api.renderTemplate(w, "edit.html", EditPageData{
 			User:  user,
 			Error: "failed to update user",
 		})
@@ -289,6 +295,24 @@ func (api *Api) DeleteUser(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	_ = api.db.DeleteUser(id)
+	err = api.db.DeleteUser(r.Context(), id)
+	if err != nil {
+		if errors.Is(err, database.ErrUserNotFound) {
+			http.Error(w, "user not found", http.StatusNotFound)
+			return
+		}
+
+		log.Printf("failed to delete user %d: %v", id, err)
+		http.Error(w, "Internal Server Error", http.StatusInternalServerError)
+		return
+	}
+
 	http.Redirect(w, r, "/users", http.StatusSeeOther)
+}
+
+func (api *Api) renderTemplate(w http.ResponseWriter, name string, data any) {
+	if err := api.templates.ExecuteTemplate(w, name, data); err != nil {
+		log.Printf("template execution failed (%s): %v", name, err)
+		http.Error(w, "Internal Server Error", http.StatusInternalServerError)
+	}
 }

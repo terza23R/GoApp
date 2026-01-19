@@ -8,8 +8,9 @@ import (
 )
 
 type Config struct {
-	Server   ServerConfig
-	Database DatabaseConfig
+	Server    ServerConfig
+	Database  DatabaseConfig
+	Templates TemplatesConfig
 }
 
 type ServerConfig struct {
@@ -21,6 +22,10 @@ type DatabaseConfig struct {
 	DSN string
 }
 
+type TemplatesConfig struct {
+	Path string
+}
+
 func Load() (*Config, error) {
 	v := viper.New()
 
@@ -30,6 +35,8 @@ func Load() (*Config, error) {
 
 	v.SetDefault("server.host", "localhost")
 	v.SetDefault("server.port", 8080)
+
+	v.SetDefault("templates.path", "templates/*.html")
 
 	v.AutomaticEnv()
 	v.SetEnvKeyReplacer(strings.NewReplacer(".", "_"))
@@ -43,6 +50,9 @@ func Load() (*Config, error) {
 		},
 		Database: DatabaseConfig{
 			DSN: v.GetString("database.dsn"),
+		},
+		Templates: TemplatesConfig{
+			Path: v.GetString("templates.path"),
 		},
 	}
 

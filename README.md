@@ -1,5 +1,10 @@
 -To run this project you need: Go, Docker and Docker Compose, and Web Browser.
 
+
+
+-Copy the example config in bash:
+   cp config.yaml.example config.yaml
+
 -You can change the server port or database DSN in config.yaml file. By default it is set as 8080.
 
 -This app is using MySQL and to start MySQL Container, from the project root folder, enter this command:

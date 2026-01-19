@@ -19,9 +19,9 @@ type Api struct {
 	templates *template.Template
 }
 
-func NewApi(hostPort string, db *database.DB) *Api {
+func NewApi(hostPort string, db *database.DB, templatesPath string) *Api {
 	r := mux.NewRouter()
-	tpl := template.Must(template.ParseGlob("templates/*.html"))
+	tpl := template.Must(template.ParseGlob(templatesPath))
 
 	api := &Api{
 		address:   hostPort,

@@ -22,7 +22,7 @@ func main() {
 
 	addr := fmt.Sprintf("%s:%d", cfg.Server.Host, cfg.Server.Port)
 
-	myApi := api.NewApi(addr, db)
+	myApi := api.NewApi(addr, db, cfg.Templates.Path)
 	myApi.Start()
 	defer myApi.Stop()
 

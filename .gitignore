@@ -12,3 +12,6 @@ Thumbs.db
 
 # Docker / runtime
 mysql_data/
+
+
+config.yaml

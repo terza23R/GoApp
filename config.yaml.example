@@ -4,3 +4,7 @@ server:
 
 database:
   dsn: "root:root@tcp(127.0.0.1:3308)/myapp?parseTime=true"
+  
+templates:
+  path: "templates/*.html"
+
