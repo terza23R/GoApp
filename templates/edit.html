@@ -1,0 +1,20 @@
+<!doctype html>
+<html>
+<head><meta charset="utf-8"><title>Edit User</title></head>
+<body>
+<h1>Edit user</h1>
+
+{{if .Error}}<p style="color:red">{{.Error}}</p>{{end}}
+
+{{if .User}}
+<form method="POST" action="/users/{{.User.ID}}">
+  <input name="name" value="{{.User.Name}}">
+  <input name="email" value="{{.User.Email}}">
+  <input name="age" type="number" value="{{.User.Age}}">
+  <button type="submit">Save</button>
+</form>
+{{end}}
+
+<p><a href="/users">Back</a></p>
+</body>
+</html>
