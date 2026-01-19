@@ -47,6 +47,7 @@ func (api *Api) registerHandlers() {
 	api.router.HandleFunc("/users", api.CreateUser).Methods(http.MethodPost)
 	api.router.HandleFunc("/users/{id}", api.EditUser).Methods(http.MethodPost)
 	api.router.HandleFunc("/users/{id}/delete", api.DeleteUser).Methods(http.MethodPost)
+	api.router.HandleFunc("/health", api.Health).Methods(http.MethodGet)
 }
 
 func (api *Api) Start() {
