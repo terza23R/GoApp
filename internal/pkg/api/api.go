@@ -2,7 +2,6 @@ package api
 
 import (
 	"context"
-	"goapp/internal/pkg/database"
 	"html/template"
 	"log"
 	"net/http"
@@ -15,12 +14,13 @@ type Api struct {
 	address   string
 	router    *mux.Router
 	server    *http.Server
-	db        *database.DB
+	db        UserRepository
 	templates *template.Template
 }
 
-func NewApi(hostPort string, db *database.DB, templatesPath string) *Api {
+func NewApi(hostPort string, db UserRepository, templatesPath string) *Api {
 	r := mux.NewRouter()
+	r.Use(loggingMiddleware)
 	tpl := template.Must(template.ParseGlob(templatesPath))
 
 	api := &Api{

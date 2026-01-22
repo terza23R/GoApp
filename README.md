@@ -27,12 +27,25 @@ CREATE TABLE users (
 
 go run ./cmd/main.go
 
+or you can use: 
+
+make run
+
 -Open the application in browser:
 
 http://localhost:8080/users
 
 
-If everything is OK, you should see the main UI of application.
+-If everything is OK, you should see the main UI of application. You can also use:
+
+GET /health
+
+and if it returns status 200 OK, the application is running. 
+
+-To run unit tests, use:
+
+go test ./...
+
 
 
 

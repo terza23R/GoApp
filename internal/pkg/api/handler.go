@@ -36,6 +36,30 @@ type EditPageData struct {
 
 var emailRegex = regexp.MustCompile(`^[a-zA-Z0-9._%+\-]+@[a-zA-Z0-9.\-]+\.[a-zA-Z]{2,}$`)
 
+func validateUserInput(name, email, ageStr string) (*database.User, string) {
+	if name == "" || email == "" {
+		return nil, "name and email are required"
+	}
+
+	if !emailRegex.MatchString(email) {
+		return nil, "invalid email format"
+	}
+
+	age, err := strconv.Atoi(ageStr)
+	if err != nil {
+		return nil, "age must be a number"
+	}
+	if age <= 0 {
+		return nil, "age must be greater than 0"
+	}
+
+	return &database.User{
+		Name:  name,
+		Email: email,
+		Age:   age,
+	}, ""
+}
+
 func (api *Api) GetUsers(w http.ResponseWriter, r *http.Request) {
 	page := 1
 	limit := 10
@@ -167,12 +191,14 @@ func (api *Api) CreateUser(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "Bad Request", http.StatusBadRequest)
 		return
 	}
+
 	name := r.FormValue("name")
 	email := r.FormValue("email")
 	ageStr := r.FormValue("age")
 
-	if name == "" || email == "" {
-		render(http.StatusBadRequest, "name and email are required", UsersForm{
+	u, msg := validateUserInput(name, email, ageStr)
+	if msg != "" {
+		render(http.StatusBadRequest, msg, UsersForm{
 			Name:  name,
 			Email: email,
 			Age:   ageStr,
@@ -180,40 +206,7 @@ func (api *Api) CreateUser(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if !emailRegex.MatchString(email) {
-		render(http.StatusBadRequest, "invalid email format", UsersForm{
-			Name:  name,
-			Email: email,
-			Age:   ageStr,
-		})
-		return
-	}
-
-	age, err := strconv.Atoi(ageStr)
-	if err != nil {
-		render(http.StatusBadRequest, "age must be a number", UsersForm{
-			Name:  name,
-			Email: email,
-			Age:   ageStr,
-		})
-		return
-	}
-	if age <= 0 {
-		render(http.StatusBadRequest, "age must be greater than 0", UsersForm{
-			Name:  name,
-			Email: email,
-			Age:   ageStr,
-		})
-		return
-	}
-
-	user := &database.User{
-		Name:  name,
-		Email: email,
-		Age:   age,
-	}
-
-	if err := api.db.CreateUser(r.Context(), user); err != nil {
+	if err := api.db.CreateUser(r.Context(), u); err != nil {
 		var mysqlErr *mysql.MySQLError
 		if errors.As(err, &mysqlErr) && mysqlErr.Number == 1062 {
 			render(http.StatusBadRequest, "email already exists", UsersForm{
@@ -251,60 +244,28 @@ func (api *Api) EditUser(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "Bad Request", http.StatusBadRequest)
 		return
 	}
+
 	name := r.FormValue("name")
 	email := r.FormValue("email")
 	ageStr := r.FormValue("age")
 
-	age, err := strconv.Atoi(ageStr)
-	if err != nil {
+	u, msg := validateUserInput(name, email, ageStr)
+	if msg != "" {
 		w.WriteHeader(http.StatusBadRequest)
 		api.renderTemplate(w, "edit.html", EditPageData{
 			User:  &database.User{ID: id, Name: name, Email: email},
-			Error: "age must be a number",
+			Error: msg,
 		})
 		return
 	}
+	u.ID = id
 
-	if name == "" || email == "" {
-		w.WriteHeader(http.StatusBadRequest)
-		api.renderTemplate(w, "edit.html", EditPageData{
-			User:  &database.User{ID: id, Name: name, Email: email, Age: age},
-			Error: "name and email are required",
-		})
-		return
-	}
-
-	if !emailRegex.MatchString(email) {
-		w.WriteHeader(http.StatusBadRequest)
-		api.renderTemplate(w, "edit.html", EditPageData{
-			User:  &database.User{ID: id, Name: name, Email: email, Age: age},
-			Error: "invalid email format",
-		})
-		return
-	}
-
-	if age <= 0 {
-		w.WriteHeader(http.StatusBadRequest)
-		api.renderTemplate(w, "edit.html", EditPageData{
-			User:  &database.User{ID: id, Name: name, Email: email, Age: age},
-			Error: "age must be greater than 0",
-		})
-		return
-	}
-
-	user := &database.User{
-		ID:    id,
-		Name:  name,
-		Email: email,
-		Age:   age,
-	}
-
-	if err := api.db.UpdateUser(r.Context(), user); err != nil {
+	if err := api.db.UpdateUser(r.Context(), u); err != nil {
 		var mysqlErr *mysql.MySQLError
 		if errors.As(err, &mysqlErr) && mysqlErr.Number == 1062 {
 			w.WriteHeader(http.StatusBadRequest)
 			api.renderTemplate(w, "edit.html", EditPageData{
-				User:  user,
+				User:  u,
 				Error: "email already exists",
 			})
 			return
@@ -313,7 +274,7 @@ func (api *Api) EditUser(w http.ResponseWriter, r *http.Request) {
 		if errors.Is(err, database.ErrUserNotFound) {
 			w.WriteHeader(http.StatusNotFound)
 			api.renderTemplate(w, "edit.html", EditPageData{
-				User:  user,
+				User:  u,
 				Error: "user not found",
 			})
 			return
@@ -322,7 +283,7 @@ func (api *Api) EditUser(w http.ResponseWriter, r *http.Request) {
 		log.Print(err)
 		w.WriteHeader(http.StatusInternalServerError)
 		api.renderTemplate(w, "edit.html", EditPageData{
-			User:  user,
+			User:  u,
 			Error: "failed to update user",
 		})
 		return

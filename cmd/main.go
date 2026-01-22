@@ -6,6 +6,9 @@ import (
 	"goapp/internal/pkg/config"
 	"goapp/internal/pkg/database"
 	"log"
+	"os"
+	"os/signal"
+	"syscall"
 )
 
 func main() {
@@ -24,7 +27,13 @@ func main() {
 
 	myApi := api.NewApi(addr, db, cfg.Templates.Path)
 	myApi.Start()
-	defer myApi.Stop()
 
-	select {}
+	stop := make(chan os.Signal, 1)
+	signal.Notify(stop, os.Interrupt, syscall.SIGTERM)
+
+	sig := <-stop
+	log.Printf("received signal: %s", sig.String())
+
+	myApi.Stop()
+	log.Println("shutdown complete")
 }
